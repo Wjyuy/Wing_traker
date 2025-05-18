@@ -36,6 +36,12 @@ YOLO는 이미지나 비디오에서 객체를 실시간으로 인식하고 위�
 
 #### 사용 모델: YOLOv11n
 
+<table>
+  <tr>
+    <td><img src="imgs/msing.png" alt="yolo_ms/img"></td>
+  </tr>
+</table>
+
 * **선택 이유:** 본 프로젝트에서는 라즈베리 파이를 이용
 * YOLOv11n은 성능이 낮은 장치에서도 실시간 추적이 가능할 정도로 처리 속도가 빠름
 * 모델이 가벼워 각 프레임에 대한 처리 시간이 짧고 ms/img가 적다
@@ -45,7 +51,7 @@ YOLO는 이미지나 비디오에서 객체를 실시간으로 인식하고 위�
 
 <table>
   <tr>
-    <td><img src="imgs/hardware.png" alt="하드웨어 구성" width="200"></td>
+    <td><img src="imgs/hardware.png" alt="하드웨어 구성"></td>
   </tr>
 </table>
 
@@ -55,8 +61,6 @@ YOLO는 이미지나 비디오에서 객체를 실시간으로 인식하고 위�
 * U2D2 (USB to Dynamixel adapter)
 * U2D2 hub
 * AX12 서보모터 *2 
-
-`U2D2는 Dynamixel 서보모터를 제어하는 데 사용, USB 포트로 연결사용, 다수의 서보 모터 ID 설정으로 독립 제어 가능. RS-485 통신으로 안정적이고 고속 통신 가능`
 
 #### 서보 모터 제어 방식
 
@@ -78,7 +82,22 @@ YOLO는 이미지나 비디오에서 객체를 실시간으로 인식하고 위�
 * Raspberry Pi 카메라 연결 및 외형 제작.
 * 서보 모터 제어 구현.
 
-### 테스트 및 결과
+<table>
+  <tr>
+    <td><img src="imgs/flow.png" alt="블록 다이어그램"></td>
+  </tr>
+</table>
+
+### 외형제작
+cad를 통한 디자인
+<table>
+  <tr>
+    <td><img src="imgs/cad (1).jpg" alt="윗면" width="200"></td>
+    <td><img src="imgs/cad (2).jpg" alt="옆면" width="200"></td>
+    <td><img src="imgs/cad (3).jpg" alt="측면" width="200"></td>
+  </tr>
+  <tr>
+</table>
 
 * 테스트 방법, 성능 평가, 결과 분석 절차
 * **주요 문제점:** 라즈베리 파이 사용으로 인해 초당 1프레임대 성능밖에 구현하지 못함
