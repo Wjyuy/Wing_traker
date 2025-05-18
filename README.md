@@ -252,13 +252,132 @@ cad를 통한 디자인 진행
   </tr>
 </table>
 
-### 시제품 개발 과정 하이라이트
+### 필터 적용 후 학습 
 
-* 설계 및 프로토타입 제작.
+* sobel,hfp,prewitt,scharr,canny 필터 적용
+* 예시 : sobel 필터
+
+```python
+    import cv2
+    import os
+    import glob
+    import shutil
+
+    # Canny 필터를 적용하고 결과를 저장하는 함수
+    def apply_canny(image_path, output_path):
+        # 이미지 읽기
+        image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+
+        # Canny 에지 검출 적용
+        edges = cv2.Canny(image, 100, 200)  # 첫 번째 인자는 하이Threshold, 두 번째는 로우Threshold
+
+        # 필터링된 이미지 저장 (원래 이름 그대로 저장)
+        cv2.imwrite(output_path, edges)
+
+    # 라벨 파일 복사 함수
+    def copy_label_file(image_file, input_label_dir, output_label_dir):
+        # 이미지 파일명에서 확장자를 .txt로 바꿈
+        image_name = os.path.basename(image_file)
+        label_name = os.path.splitext(image_name)[0] + '.txt'
+
+        input_label_path = os.path.join(input_label_dir, label_name)
+        output_label_path = os.path.join(output_label_dir, label_name)
+
+        # 라벨 파일이 존재할 경우 복사
+        if os.path.exists(input_label_path):
+            shutil.copy(input_label_path, output_label_path)
+
+    # 디렉토리 내 모든 이미지에 Canny 필터 적용하고 레이블 파일도 복사하는 함수
+    def process_images_and_labels(input_image_dir, input_label_dir, output_image_dir, output_label_dir):
+        # 결과 저장 경로가 없으면 생성
+        os.makedirs(output_image_dir, exist_ok=True)
+        os.makedirs(output_label_dir, exist_ok=True)
+
+        # 이미지 파일 처리
+        for image_file in glob.glob(os.path.join(input_image_dir, '*.jpg')):  # jpg 형식으로 가정
+            image_name = os.path.basename(image_file)
+            output_image_path = os.path.join(output_image_dir, image_name)  # _filter 없이 저장
+
+            # Canny 필터 적용 및 저장
+            apply_canny(image_file, output_image_path)
+
+            # 라벨 파일 복사
+            copy_label_file(image_file, input_label_dir, output_label_dir)
+
+    # 경로 설정
+    train_image_dir = '/content/trash-laden-balloons,-UAV,-Drone-1/train/images'
+    val_image_dir = '/content/trash-laden-balloons,-UAV,-Drone-1/valid/images'
+    test_image_dir = '/content/trash-laden-balloons,-UAV,-Drone-1/test/images'
+
+    train_label_dir = '/content/trash-laden-balloons,-UAV,-Drone-1/train/labels'
+    val_label_dir = '/content/trash-laden-balloons,-UAV,-Drone-1/valid/labels'
+    test_label_dir = '/content/trash-laden-balloons,-UAV,-Drone-1/test/labels'
+
+    train_output_image_dir = '/content/trash-laden-balloons,-UAV,-Drone-1/train_canny/images'
+    val_output_image_dir = '/content/trash-laden-balloons,-UAV,-Drone-1/valid_canny/images'
+    test_output_image_dir = '/content/trash-laden-balloons,-UAV,-Drone-1/test_canny/images'
+
+    train_output_label_dir = '/content/trash-laden-balloons,-UAV,-Drone-1/train_canny/labels'
+    val_output_label_dir = '/content/trash-laden-balloons,-UAV,-Drone-1/valid_canny/labels'
+    test_output_label_dir = '/content/trash-laden-balloons,-UAV,-Drone-1/test_canny/labels'
+
+    # 각 폴더에 대해 Canny 필터 적용 및 라벨 파일 복사
+    process_images_and_labels(train_image_dir, train_label_dir, train_output_image_dir, train_output_label_dir)
+    process_images_and_labels(val_image_dir, val_label_dir, val_output_image_dir, val_output_label_dir)
+    process_images_and_labels(test_image_dir, test_label_dir, test_output_image_dir, test_output_label_dir)
+
+    print("Canny edge detection and label copying completed for train, valid, and test sets.")
+```
+
+* 불규칙한 도시지형에서 좀더 쉽게 edge를 감지하고자 edge detection을 위해 다섯 종류의 필터를 적용하여 학습
+
+<table>
+  <tr>
+    <td>적용 전</td>
+    <td>적용 후</td>
+  </tr>
+  <tr>
+    <td><img src="imgs/before.png" alt="b" ></td>
+    <td><img src="imgs/after.png" alt="b" ></td>
+  </tr>
+</table>
+
+* 결과적으로는 Original vesion과 성능이 비슷해 채용하지 않음
+
+<table>
+  <tr>
+    <td>Training Metrics and Loss</td>
+  </tr>
+  <tr>
+    <td><img src="imgs/ed.png" alt="Training Metrics and Loss" ></td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td>Confusion Matrix</td>
+  </tr>
+  <tr>
+    <td><img src="imgs/conf.png" alt="Confusion Matrix" ></td>
+  </tr>
+</table>
+
+### 결과
+
+* 오물풍선은 학습 결과가 만족스럽진 않았지만, 인식은 되었다
+* 무인기는 roboflow 학습 데이터를 사용하여 인식이 잘 되었다 
+<table>
+  <tr>
+    <td>오물풍선</td>
+    <td>무인기</td>
+  </tr>
+  <tr>
+    <td><img src="imgs/fin1.png" alt="오물풍선" ></td>
+    <td><img src="imgs/fin2.png" alt="무인기" ></td>
+  </tr>
+</table>
 
 
-
-* 테스트 방법, 성능 평가, 결과 분석 절차
 * **주요 문제점:** 라즈베리 파이 사용으로 인해 초당 1프레임대 성능밖에 구현하지 못함
 
 ### 문제점 및 개선사항
