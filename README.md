@@ -73,6 +73,136 @@ YOLO는 이미지나 비디오에서 객체를 실시간으로 인식하고 위�
 5.  계산된 목표 위치가 지정된 범위를 벗어나지 않도록 유효성 검사 및 보정을 수행
 6.  실시간으로 객체를 추적하고, 객체가 화면에 나타날 때마다 서보 모터를 해당 위치로 이동시켜 물리적 공간에서 객체를 추적
 
+```python
+    from ultralytics import YOLO
+    from dynamixel_sdk import *  # Dynamixel SDK library
+    import time
+
+    # Dynamixel configuration
+    ADDR_TORQUE_ENABLE = 24
+    ADDR_GOAL_POSITION = 30
+    ADDR_PRESENT_POSITION = 36
+
+    PROTOCOL_VERSION = 1.0
+    DXL_ID_X = 2  # Dynamixel ID for X-axis
+    DXL_ID_Y = 1  # Dynamixel ID for Y-axis
+    BAUDRATE = 1000000
+    DEVICENAME = '/dev/ttyUSB0'
+
+    TORQUE_ENABLE = 1
+    DXL_MIN_POSITION = 600  # Minimum position value
+    DXL_MAX_POSITION = 1000  # Maximum position value
+
+    SCREEN_WIDTH = 1200
+    SCREEN_HEIGHT = 1200
+
+    DEAD_ZONE = 20  # Dead zone in pixels
+    SMOOTH_STEP = 2  # Movement step size for smooth motion
+    DELAY_BETWEEN_MOVES = 0.1 # Delay between servo movements (in seconds)
+
+    # Initialize PortHandler and PacketHandler
+    port_handler = PortHandler(DEVICENAME)
+    packet_handler = PacketHandler(PROTOCOL_VERSION)
+
+    # Open port
+    if not port_handler.openPort():
+        print("Failed to open port")
+        exit()
+
+    # Set baudrate
+    if not port_handler.setBaudRate(BAUDRATE):
+        print("Failed to set baudrate")
+        exit()
+
+    # Enable torque for both servos
+    for DXL_ID in [DXL_ID_X, DXL_ID_Y]:
+        dxl_comm_result, dxl_error = packet_handler.write1ByteTxRx(port_handler, DXL_ID, ADDR_TORQUE_ENABLE, TORQUE_ENABLE)
+        if dxl_comm_result != COMM_SUCCESS:
+            print(f"Communication Error: {packet_handler.getTxRxResult(dxl_comm_result)}")
+        elif dxl_error != 0:
+            print(f"Torque Enable Error for ID {DXL_ID}: {packet_handler.getRxPacketError(dxl_error)}")
+        else:
+            print(f"Dynamixel ID {DXL_ID} successfully connected")
+
+    # Function to gradually move servo to the target position
+    def move_servo_smoothly(packet_handler, port_handler, dxl_id, current_position, target_position, step=SMOOTH_STEP):
+        while abs(current_position - target_position) > step:
+            if current_position < target_position:
+                current_position += step
+            elif current_position > target_position:
+                current_position -= step
+            
+            # Write intermediate position
+            dxl_comm_result, dxl_error = packet_handler.write2ByteTxRx(port_handler, dxl_id, ADDR_GOAL_POSITION, current_position)
+            if dxl_comm_result != COMM_SUCCESS:
+                print(f"Communication Error: {packet_handler.getTxRxResult(dxl_comm_result)}")
+            elif dxl_error != 0:
+                print(f"Dynamixel Error: {packet_handler.getRxPacketError(dxl_error)}")
+            
+            # Pause slightly to allow smooth movement
+            time.sleep(0.01)
+
+        # Set final position
+        dxl_comm_result, dxl_error = packet_handler.write2ByteTxRx(port_handler, dxl_id, ADDR_GOAL_POSITION, target_position)
+        if dxl_comm_result != COMM_SUCCESS:
+            print(f"Final Position Communication Error: {packet_handler.getTxRxResult(dxl_comm_result)}")
+        elif dxl_error != 0:
+            print(f"Final Position Dynamixel Error: {packet_handler.getRxPacketError(dxl_error)}")
+
+    # YOLO model setup
+    model = YOLO('/home/wtf/yolo11n version best weight.pt')
+    results = model.predict(source='tcp://127.0.0.1:8888', stream=True, show=True)
+
+    # Initialize current positions for both servos
+    current_position_x = 800  # Initial midpoint
+    current_position_y = 800
+
+    # Offsets for fine-tuning
+    X_OFFSET = 50
+    Y_OFFSET = 50
+
+    # Main loop for real-time object tracking
+    # Main loop for real-time object tracking
+    for r in results:  # Frame-by-frame processing
+        for box in r.boxes:
+            # Check if the detected object is a person (class ID = 0)
+            if box.cls[0] == 0:  # Assuming '0' is the class ID for 'person'
+                # Extract center coordinates
+                x1, y1, x2, y2 = box.xyxy[0].tolist()
+                x_center = (x1 + x2) / 2
+                y_center = (y1 + y2) / 2
+
+                # Reverse X and Y mappings
+                target_position_x = int(current_position_x + (DXL_MAX_POSITION - DXL_MIN_POSITION) * 0.5*(1-x_center / SCREEN_WIDTH))
+                target_position_y = int(current_position_y + (DXL_MAX_POSITION - DXL_MIN_POSITION) * 0.5*(y_center / SCREEN_HEIGHT))
+
+                # Ensure target positions are within valid range
+                target_position_x = max(DXL_MIN_POSITION, min(DXL_MAX_POSITION, target_position_x))
+                target_position_y = max(DXL_MIN_POSITION, min(DXL_MAX_POSITION, target_position_y))
+
+                # Write directly to servos
+                dxl_comm_result_x, dxl_error_x = packet_handler.write2ByteTxRx(port_handler, DXL_ID_X, ADDR_GOAL_POSITION, target_position_x)
+                if dxl_comm_result_x != COMM_SUCCESS:
+                    print(f"Error moving X servo: {packet_handler.getTxRxResult(dxl_comm_result_x)}")
+                elif dxl_error_x != 0:
+                    print(f"Dynamixel X Error: {packet_handler.getRxPacketError(dxl_error_x)}")
+
+                dxl_comm_result_y, dxl_error_y = packet_handler.write2ByteTxRx(port_handler, DXL_ID_Y, ADDR_GOAL_POSITION, target_position_y)
+                if dxl_comm_result_y != COMM_SUCCESS:
+                    print(f"Error moving Y servo: {packet_handler.getTxRxResult(dxl_comm_result_y)}")
+                elif dxl_error_y != 0:
+                    print(f"Dynamixel Y Error: {packet_handler.getRxPacketError(dxl_error_y)}")
+
+                print(f"Person detected. Moving to (X: {target_position_x}, Y: {target_position_y})")
+
+                # Add delay to slow down updates
+                time.sleep(DELAY_BETWEEN_MOVES)
+
+
+    # Close port when done
+    port_handler.closePort()
+```
+
 ### 시제품 개발 과정 하이라이트
 
 * 설계 및 프로토타입 제작.
@@ -89,15 +219,44 @@ YOLO는 이미지나 비디오에서 객체를 실시간으로 인식하고 위�
 </table>
 
 ### 외형제작
-cad를 통한 디자인
+cad를 통한 디자인 진행
 <table>
+  <tr>
+    <td>윗면</td>
+    <td>옆면</td>
+    <td>측면</td>
+  </tr>
   <tr>
     <td><img src="imgs/cad (1).jpg" alt="윗면" width="200"></td>
     <td><img src="imgs/cad (2).jpg" alt="옆면" width="200"></td>
     <td><img src="imgs/cad (3).jpg" alt="측면" width="200"></td>
   </tr>
-  <tr>
 </table>
+
+### 데이터 전처리 과정
+
+* roboflow 의 데이터 (비행체)
+* 추가적인 데이터 전처리 및 라벨링 ([labelImg](https://github.com/HumanSignal/labelImg) 사용, Balloon, UAV, Drone 클래스).
+
+### 데이터 증강 기법
+
+* 오물풍선의 데이터 수집을 위해 좌우반전,밝기조절, 회전, 노이즈, 확대 축소 등을 이용
+<table>
+  <tr>
+    <td>증강 적용 된 오물풍선 이미지들</td>
+    <td>labelImg로 크롤링</td>
+  </tr>
+  <tr>
+    <td><img src="imgs/ballons.png" alt="ballons"></td>
+    <td><img src="imgs/lab2.png" alt="lab2"></td>
+  </tr>
+</table>
+
+### 시제품 개발 과정 하이라이트
+
+* 설계 및 프로토타입 제작.
+
+
 
 * 테스트 방법, 성능 평가, 결과 분석 절차
 * **주요 문제점:** 라즈베리 파이 사용으로 인해 초당 1프레임대 성능밖에 구현하지 못함
